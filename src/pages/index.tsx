@@ -11,6 +11,7 @@ import './index.css';
 export default function () {
   return (
     <>
+      <h1>基础上传功能</h1>
       <Row gutter={[0, 50]}>
         <Col span={24}>
           <Divider orientation="left">基本上传功能, form上传方式</Divider>
