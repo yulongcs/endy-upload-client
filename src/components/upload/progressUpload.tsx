@@ -53,7 +53,10 @@ export function ProgressUpload (props: Props) {
       onUploadProgress: (e: ProgressEvent) => {
         const { loaded, total } = e;
         setPercent(+(loaded /total * 100).toFixed());
-        console.log('upload-progress', +(loaded/total * 100).toFixed());
+        console.log('upload-onUploadProgress', {
+          ProgressEvent: e,
+          Progress: +(loaded/total * 100).toFixed()
+        });
       },
     }).then((res) => {
       console.log('上传结果', res.data);

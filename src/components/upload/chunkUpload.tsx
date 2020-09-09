@@ -7,14 +7,15 @@ import { Input, Row, Col, Button, message, Progress, Table } from 'antd';
 import axios from "axios";
 import styles from './index.css';
 
-// 切片大小 10MB
-const CHUNK_SIZE = 1024 * 1024 * 2;
+// 切片大小 1MB
+const CHUNK_SIZE = 1024 * 1024 * 1;
 
 enum UploadStatus {
   INIT, //初始态
   PAUSE, //暂停中
   UPLOADING, //上传中
   UPLOADED, // 上传完成
+  ERROR, // 上传失败
 }
 
 // 切片
@@ -72,6 +73,7 @@ export function ChunkUpload(props: Props) {
         url: 'http://localhost:7001/merge',
         method: 'POST',
         headers: { 'Content-Type': "application/json" },
+        timeout: 0,
         data: {
           filename,
           size: CHUNK_SIZE,
@@ -83,6 +85,7 @@ export function ChunkUpload(props: Props) {
     } catch (err) {
       console.log('上传失败', err);
       message.info('上传失败!');
+      setUploadStatus(UploadStatus.ERROR);
     }
   }
 
@@ -126,7 +129,7 @@ export function ChunkUpload(props: Props) {
       <Row>
         <Col span={24}>
           {
-            ([UploadStatus.UPLOADING, UploadStatus.UPLOADED].includes(uploadStatus)) && (
+            ([UploadStatus.UPLOADING, UploadStatus.UPLOADED, UploadStatus.ERROR].includes(uploadStatus)) && (
               <>
                 <Row>
                   <Col span={4}>
