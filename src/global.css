@@ -8,3 +8,11 @@ body {
   margin: 0;
   background: #ccc;
 }
+
+h1 {
+  text-align: center;
+}
+
+.ant-descriptions {
+  margin: 10px 0;
+}
