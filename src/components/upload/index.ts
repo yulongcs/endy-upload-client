@@ -6,3 +6,4 @@ export * from './chunkUpload';
 export * from './hashUpload';
 export * from './webWorkUpload';
 export * from './idleUpload';
+export * from './sampleHashUpload';

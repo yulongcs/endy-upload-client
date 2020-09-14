@@ -5,6 +5,7 @@ import {
   HashUpload,
   WebWorkUpload,
   IdleUpload,
+  SampleHashUpload,
 } from '../components/upload';
 import './index.css';
 
@@ -38,6 +39,13 @@ export default function () {
         <Col span={24}>
           <Divider orientation="left">高级上传 - requestIdleCallback 浏览器空闲时间计算/上传</Divider>
           <IdleUpload />
+        </Col>
+      </Row>
+
+      <Row gutter={[0, 50]}>
+        <Col span={24}>
+          <Divider orientation="left">高级上传 - 抽样计算Hash</Divider>
+          <SampleHashUpload />
         </Col>
       </Row>
     </>
