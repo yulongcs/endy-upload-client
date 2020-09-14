@@ -4,6 +4,7 @@ import {
   ChunkUpload,
   HashUpload,
   WebWorkUpload,
+  IdleUpload,
 } from '../components/upload';
 import './index.css';
 
@@ -28,9 +29,15 @@ export default function () {
 
       <Row gutter={[0, 50]}>
         <Col span={24}>
-          <Divider orientation="left">高级上传 - web-worker 子线程</Divider>
-          <p></p>
+          <Divider orientation="left">高级上传 - web-worker 子线程计算hash</Divider>
           <WebWorkUpload />
+        </Col>
+      </Row>
+
+      <Row gutter={[0, 50]}>
+        <Col span={24}>
+          <Divider orientation="left">高级上传 - requestIdleCallback 浏览器空闲时间计算/上传</Divider>
+          <IdleUpload />
         </Col>
       </Row>
     </>

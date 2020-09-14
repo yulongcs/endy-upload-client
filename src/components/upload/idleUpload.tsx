@@ -32,13 +32,15 @@ interface Props {
 
 }
 
-export function HashUpload(props: Props) {
+export function IdleUpload(props: Props) {
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>(UploadStatus.INIT);
   const [currentFile, setCurrentFile] = useState<File>();
   const [partList, setPartList] = useState<Part[]>([]);
   const [filename, setFilename] = useState<string>('');
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
   const [calculateProcess, setCalculateProcess] = useState<number>(0);
+  const [uploadProcess,setUploadProcess] = useState<number>(0);
+  const [worker, setWorker] = useState<any>(null);
 
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -80,63 +82,89 @@ export function HashUpload(props: Props) {
     // 上传文件
     setUploadStatus(UploadStatus.UPLOADING);
     await uploadParts(partList, filename);
+
+    // 切片上传完毕，发送合并请求
+    await merge(filename, CHUNK_SIZE);
   }
 
-  // 计算Hash， Spark-MD5获取文件MD5的hash标识
-  async function calculateHash(partList: Part[]) {
-    const spark = new SparkMD5.ArrayBuffer();
-    var percent = 0; // 计算Hash总进度
-    var perSize = 100 / partList.length; // 每一个切片占总进度的大小
+  // 计算Hash，使用requestIdleCallback,浏览器空闲的时候计算hash值，不阻塞主线程
+  const calculateHash = (partList: Part[]): Promise<string> => {
+    return new Promise(resolve => {
+      const spark = new SparkMD5.ArrayBuffer();
+      let percent = 0; // 计算Hash总进度
+      let count = 0;
 
-    await Promise.all(
-      partList.map(({ chunk }) => {
-        return new Promise((resolve) => {
+      // 计算切片Hash值
+      const appendToSpark = async (file: Blob) => {
+        return new Promise(resolve => {
           const reader = new FileReader();
-          // 读取切片内容
-          reader.readAsArrayBuffer(chunk);
-          reader.onload = (e) => {
-            percent += perSize; // 没计算一个切片，进度累加
-            // 设置文件计算Hash总进度
-            setCalculateProcess(+percent.toFixed(2));
+          reader.readAsArrayBuffer(file);
+          reader.onload = e => {
             // 增量计算md5
             spark.append(e?.target?.result as ArrayBuffer);
             resolve();
-          }
-        })
-      })
-    );
+          };
+        });
+      };
 
-    // 计算完毕, 返回文件MD5值
-    return spark.end();
+      const workLoop = async (deadline: any) => {
+        // 有任务，并且当前帧还没结束
+        while (count < partList.length && deadline.timeRemaining() > 1) {
+          await appendToSpark(partList[count].chunk);
+          count++;
+          // 没有了 计算完毕
+          if (count < partList.length) {
+            // 计算中
+            percent = (100 * count) / partList.length; // 每计算一个切片，进度累加
+            // 设置文件计算Hash总进度
+            setCalculateProcess(+percent.toFixed(2));
+          } else {
+            // 计算完毕
+            setCalculateProcess(100);
+            resolve(spark.end());
+          }
+        }
+
+
+        if (count < partList.length) {
+          window.requestIdleCallback(workLoop);
+        }
+      };
+      // 将在浏览器的空闲时段内对要调用的函数进行排队，空闲时间去执行切片Hash值计算
+      window.requestIdleCallback(workLoop);
+    });
   }
 
-  async function uploadParts(partList: Part[], filename: string) {
+  function uploadParts(partList: Part[], filename: string) {
     try {
-      let requests = createRequests(partList);
-      // 上传切片
-      await Promise.all(requests);
+      return new Promise(resolve => {
+        let percent = 0; // 上传总进度
+        let count = 0; // 当前上传数
 
-      // 合并切片
-      const { data = {} } = await axios({
-        url: 'http://localhost:7001/merge',
-        method: 'POST',
-        headers: { 'Content-Type': "application/json" },
-        timeout: 0,
-        data: {
-          filename,
-          size: CHUNK_SIZE,
+        const workLoop = async (deadline: any) => {
+          while (count < partList.length && deadline.timeRemaining() > 1) {
+            await createRequest(partList[count]);
+            count++;
+            // 没有了 计算完毕
+            if (count < partList.length) {
+              // 计算中
+              percent = (100 * count) / partList.length; // 每计算一个切片，进度累加
+              // 设置文件计算Hash总进度
+              setUploadProcess(+percent.toFixed(2));
+            } else {
+              // 计算完毕
+              setCalculateProcess(100);
+              resolve();
+            }
+          }
+
+          if (count < partList.length) {
+            window.requestIdleCallback(workLoop);
+          }
         }
+
+        window.requestIdleCallback(workLoop);
       });
-
-      const { success, url } = data;
-
-      setUploadStatus(UploadStatus.UPLOADED);
-
-      if (success) {
-        setUploadStatus(UploadStatus.UPLOADED);
-        setUploadedFileUrl(url)
-        message.info('上传成功!');
-      }
     } catch (err) {
       console.log('上传失败', err);
       message.info('上传失败!');
@@ -144,27 +172,54 @@ export function HashUpload(props: Props) {
     }
   }
 
-  // 切片上传
-  function createRequests(partList: Part[]) {
-    return partList.map((part: Part) => {
-      const formData = new FormData();
-      formData.append("file", part.chunk);
-      return axios({
-        url: `http://localhost:7001/upload/${part.filename}/${part.chunk_name}`,
-        method: 'POST',
-        data: formData,
-        timeout: 0,
-        timeoutErrorMessage: '上传超时',
-        onUploadProgress: (e: ProgressEvent) => {
-          const { loaded, total } = e;
-          part.percent = +(loaded / total * 100).toFixed();
-          setPartList([...partList]);
-        },
-      });
-    })
+  /**
+   * 
+   * @param filename 文件名称
+   * @param chuckSize 固定切片大小
+   */
+  async function merge(filename: string, chuckSize: number) {
+    // 合并切片
+    const { data = {} } = await axios({
+      url: 'http://localhost:7001/merge',
+      method: 'POST',
+      headers: { 'Content-Type': "application/json" },
+      timeout: 0,
+      data: {
+        filename,
+        size: chuckSize,
+      }
+    });
+
+    const { success, url } = data;
+
+    setUploadStatus(UploadStatus.UPLOADED);
+
+    if (success) {
+      setUploadStatus(UploadStatus.UPLOADED);
+      setUploadedFileUrl(url)
+      message.info('上传成功!');
+    }
   }
 
-  let totalPercent = partList.length > 0 ? Math.round(partList.reduce((acc, curr) => acc + curr.percent!, 0) / (partList.length * 100) * 100) : 0;
+  // 切片上传
+  async function createRequest(part: Part) {
+    const formData = new FormData();
+    formData.append("file", part.chunk);
+    return axios({
+      url: `http://localhost:7001/upload/${part.filename}/${part.chunk_name}`,
+      method: 'POST',
+      data: formData,
+      timeout: 0,
+      timeoutErrorMessage: '上传超时',
+      onUploadProgress: (e: ProgressEvent) => {
+        const { loaded, total } = e;
+        part.percent = +(loaded / total * 100).toFixed();
+        setPartList([...partList]);
+      },
+    });
+  }
+
+  // let totalPercent = partList.length > 0 ? Math.round(partList.reduce((acc, curr) => acc + curr.percent!, 0) / (partList.length * 100) * 100) : 0;
 
   const fileSize = `${(currentFile?.size! / 1024 / 1024).toFixed(2)} MB`
 
@@ -179,7 +234,7 @@ export function HashUpload(props: Props) {
             style={{ marginLeft: 10 }}
             type="primary"
             onClick={handleUpload}
-            loading={uploadStatus === UploadStatus.UPLOADING}
+            loading={[UploadStatus.CALCULATE, UploadStatus.UPLOADING].includes(uploadStatus)}
           >
             上传
           </Button>
@@ -203,16 +258,29 @@ export function HashUpload(props: Props) {
       <Row>
         <Col span={24}>
           {
-            uploadStatus === UploadStatus.CALCULATE &&
+            [UploadStatus.CALCULATE, UploadStatus.UPLOADING].includes(uploadStatus) &&
             (
-              <Row>
-                <Col span={4}>
-                  计算文件Hash进度:
+              <>
+                <Row>
+                  <Col span={4}>
+                    <Button
+                      style={{ marginLeft: 10 }}
+                      type="primary"
+                      onClick={() => sleep(10)}
+                    >
+                      阻塞主线程 10 秒钟
+                     </Button>
+                  </Col>
+                </Row>
+                <Row>
+                  <Col span={4}>
+                    计算文件Hash进度:
                 </Col>
-                <Col span={20}>
-                  <Progress percent={calculateProcess} />
-                </Col>
-              </Row>
+                  <Col span={20}>
+                    <Progress percent={calculateProcess} />
+                  </Col>
+                </Row>
+              </>
             )
           }
         </Col>
@@ -227,7 +295,7 @@ export function HashUpload(props: Props) {
                     上传进度:
                   </Col>
                   <Col span={20}>
-                    <Progress percent={totalPercent} />
+                    <Progress percent={uploadProcess} />
                   </Col>
                 </Row>
                 <Table
@@ -274,4 +342,12 @@ function createChunks(file: File): Part[] {
     current += CHUNK_SIZE;
   }
   return partList;
+}
+
+// 阻塞主线程
+function sleep(second: number) {
+  var start = (new Date()).getTime();
+  while ((new Date()).getTime() - start < second * 1000) {
+    continue;
+  }
 }
