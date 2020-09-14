@@ -4,3 +4,4 @@ export * from './imageUpload';
 export * from './progressUpload';
 export * from './chunkUpload';
 export * from './hashUpload';
+export * from './webWorkUpload';
