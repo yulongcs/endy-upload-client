@@ -7,3 +7,4 @@ export * from './hashUpload';
 export * from './webWorkUpload';
 export * from './idleUpload';
 export * from './sampleHashUpload';
+export * from './concurrentUpload';

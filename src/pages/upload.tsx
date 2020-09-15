@@ -6,6 +6,7 @@ import {
   WebWorkUpload,
   IdleUpload,
   SampleHashUpload,
+  ConcurrentUpload,
 } from '../components/upload';
 import './index.css';
 
@@ -46,6 +47,13 @@ export default function () {
         <Col span={24}>
           <Divider orientation="left">高级上传 - 抽样计算Hash</Divider>
           <SampleHashUpload />
+        </Col>
+      </Row>
+
+      <Row gutter={[0, 50]}>
+        <Col span={24}>
+          <Divider orientation="left">高级上传 - 请求并发控制</Divider>
+          <ConcurrentUpload />
         </Col>
       </Row>
     </>
