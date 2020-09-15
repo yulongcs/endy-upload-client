@@ -7,6 +7,7 @@ import {
   IdleUpload,
   SampleHashUpload,
   ConcurrentUpload,
+  VerifyUpload,
 } from '../components/upload';
 import './index.css';
 
@@ -54,6 +55,13 @@ export default function () {
         <Col span={24}>
           <Divider orientation="left">高级上传 - 请求并发控制</Divider>
           <ConcurrentUpload />
+        </Col>
+      </Row>
+
+      <Row gutter={[0, 50]}>
+        <Col span={24}>
+          <Divider orientation="left">高级上传 - 断点续传，秒传</Divider>
+          <VerifyUpload />
         </Col>
       </Row>
     </>
