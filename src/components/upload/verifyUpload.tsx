@@ -94,9 +94,28 @@ export function VerifyUpload(props: Props) {
     }
 
     // 上传文件
-    setUploadProcess(0);
     setUploadStatus(UploadStatus.UPLOADING);
-    await uploadParts(partList, uploadedList, CONCURRENT_MIX);
+    // 过滤掉以及上传完毕的切片
+    let updatedChuckCount = 0;
+    let total = partList.length;
+    partList = partList.filter((part: Part) => {
+      let uploadedFile = uploadedList.find((item: Uploaded) => item.filename === part.chunk_name);
+      if(!uploadedFile) {
+        part.loaded = 0;
+        part.percent = 0;
+        return true;
+      }
+      if(uploadedFile.size < part.size) {
+        part.loaded = uploadedFile.size;
+        part.percent = Number(((part.loaded! / part.size) * 100).toFixed(2));
+        return true;
+      }
+      updatedChuckCount++;
+      return false
+    })
+    // 设置已经上传的切片占总进度的比例
+    setUploadProcess(+((100 * updatedChuckCount) / partList.length).toFixed(2));
+    await uploadParts(partList, CONCURRENT_MIX, updatedChuckCount);
 
     // 切片上传完毕，发送合并请求
     await merge(filename, CHUNK_SIZE);
@@ -172,7 +191,7 @@ export function VerifyUpload(props: Props) {
    * @param filename 文件Hash名称
    * @param max 最大并发数
    */
-  async function uploadParts(partList: Part[], uploadedList: Uploaded[], max: number) {
+  async function uploadParts(partList: Part[], max: number, updatedChuckCount: number) {
     try {
       return new Promise(resolve => {
         let percent = 0; // 上传总进度
@@ -180,18 +199,18 @@ export function VerifyUpload(props: Props) {
 
         const workLoop = async (deadline: any) => {
           while (count < partList.length && deadline.timeRemaining() > 1) {
-            let requests = createRequests(partList.slice(count, count + max), uploadedList);
+            let requests = createRequests(partList.slice(count, count + max));
             // 上传切片
             await Promise.all(requests);
             count += max;
-            // 没有了 计算完毕
+
             if (count < partList.length) {
-              // 计算中
-              percent = (100 * count) / partList.length; // 每计算一个切片，进度累加
-              // 设置文件计算Hash总进度
+              // 切片上传中
+              percent = ((count + updatedChuckCount) * 100) / (partList.length + updatedChuckCount); // 每计算一个切片，进度累加
+              // 设置文件上传总进度
               setUploadProcess(+percent.toFixed(2));
             } else {
-              // 计算完毕
+              // 切片上传完毕
               setCalculateProcess(100);
               resolve();
             }
@@ -252,23 +271,8 @@ export function VerifyUpload(props: Props) {
   }
 
   // 切片上传
-  function createRequests(partList: Part[], uploadedList: Uploaded[]) {
-    return partList
-    .filter((part: Part) => {
-      let uploadedFile = uploadedList.find(item => item.filename === part.chunk_name);
-      if(!uploadedFile) {
-        part.loaded = 0;
-        part.percent = 0;
-        return true;
-      }
-      if(uploadedFile.size < part.size) {
-        part.loaded = uploadedFile.size;
-        part.percent = Number(((part.loaded / part.size) * 100).toFixed(2));
-        return true;
-      }
-      return false
-    })
-    .map((part: Part) => {
+  function createRequests(partList: Part[]) {
+    return partList.map((part: Part) => {
       const formData = new FormData();
       // 截取未上传的部分
       formData.append("file", part.chunk.slice(part.loaded));
