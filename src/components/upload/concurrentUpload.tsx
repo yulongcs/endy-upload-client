@@ -84,7 +84,7 @@ export function ConcurrentUpload(props: Props) {
 
     // 上传文件
     setUploadStatus(UploadStatus.UPLOADING);
-    await uploadParts(partList, filename, CONCURRENT_MIX);
+    await uploadParts(partList, CONCURRENT_MIX);
 
     // 切片上传完毕，发送合并请求
     await merge(filename, CHUNK_SIZE);
@@ -155,12 +155,11 @@ export function ConcurrentUpload(props: Props) {
   }
 
   /**
-   * 控制并发删除文件
+   * 控制并发上传文件请求数
    * @param partList 切片列表
-   * @param filename 文件Hash名称
    * @param max 最大并发数
    */
-  function uploadParts(partList: Part[], filename: string, max: number) {
+  function uploadParts(partList: Part[], max: number) {
     try {
       return new Promise(resolve => {
         let percent = 0; // 上传总进度
@@ -168,12 +167,9 @@ export function ConcurrentUpload(props: Props) {
 
         const workLoop = async (deadline: any) => {
           while (count < partList.length && deadline.timeRemaining() > 1) {
-            console.log('endy-workLoop', {
-              count,
-              size: partList.length,
-            });
+            // 截取切片数组，创建并发请求
             let requests = createRequests(partList.slice(count, count + max));
-            // 上传切片
+            // 等待一组请求返回
             await Promise.all(requests);
             count += max;
             // 没有了 计算完毕
@@ -197,7 +193,6 @@ export function ConcurrentUpload(props: Props) {
         window.requestIdleCallback(workLoop);
       });
     } catch (err) {
-      console.log('上传失败', err);
       message.info('上传失败!');
       setUploadStatus(UploadStatus.ERROR);
     }

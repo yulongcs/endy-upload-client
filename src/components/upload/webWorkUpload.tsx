@@ -39,8 +39,6 @@ export function WebWorkUpload(props: Props) {
   const [filename, setFilename] = useState<string>('');
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string>('');
   const [calculateProcess, setCalculateProcess] = useState<number>(0);
-  const [worker, setWorker] = useState<any>(null);
-
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file: File = event.target.files![0];
@@ -86,14 +84,18 @@ export function WebWorkUpload(props: Props) {
   // 计算Hash，使用web-work开通子线程计算Hash
   const calculateHash = (partList: Part[]): Promise<string> => {
     return new Promise(resolve => {
+      // 创建work线程
       let worker = new Worker("/hash.js");
-      setWorker(worker);
+      // 向work发消息
       worker.postMessage({ partList });
+      // 监听worker线程回传的消息
       worker.onmessage = (event) => {
         const { percent, hash } = event.data;
         setCalculateProcess(percent);
         if (hash) {
           resolve(hash);
+          // 主线程关闭worker
+          worker.terminate();
         }
       };
     });

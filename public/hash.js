@@ -22,7 +22,9 @@ self.onmessage = function (event) {
               self.postMessage({
                   progress:100,
                   hash:spark.end()
-              })
+              });
+              // 关闭worker
+              self.close();
           }else{
               // 每个区块计算结束，通知进度即可
               percent += 100/partList.length

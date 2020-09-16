@@ -95,7 +95,7 @@ export function HashUpload(props: Props) {
           // 读取切片内容
           reader.readAsArrayBuffer(chunk);
           reader.onload = (e) => {
-            percent += perSize; // 没计算一个切片，进度累加
+            percent += perSize; // 每计算一个切片，进度累加
             // 设置文件计算Hash总进度
             setCalculateProcess(+percent.toFixed(2));
             // 增量计算md5

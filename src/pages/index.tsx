@@ -5,6 +5,7 @@ import {
   BaseUplod,
   ImageUpload,
   ProgressUpload,
+  ChunkUpload,
 } from '../components/upload';
 import './index.css';
 
@@ -37,6 +38,13 @@ export default function () {
         <Col span={24}>
           <Divider orientation="left">文件上传，进度条，axios上传方式</Divider>
           <ProgressUpload />
+        </Col>
+      </Row>
+
+      <Row gutter={[0, 50]}>
+        <Col span={24}>
+          <Divider orientation="left">文件上传，分片上传，axios上传方式</Divider>
+          <ChunkUpload />
         </Col>
       </Row>
     </>

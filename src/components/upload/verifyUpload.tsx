@@ -199,6 +199,7 @@ export function VerifyUpload(props: Props) {
 
         const workLoop = async (deadline: any) => {
           while (count < partList.length && deadline.timeRemaining() > 1) {
+            // 创建上传请求，截取未上传的部分
             let requests = createRequests(partList.slice(count, count + max));
             // 上传切片
             await Promise.all(requests);

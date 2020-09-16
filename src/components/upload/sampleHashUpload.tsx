@@ -91,7 +91,7 @@ export function SampleHashUpload(props: Props) {
   // 1. 文件切片
   // 2. 第一个和最后一个切片全部内容，其他切片的取 首中尾三个地方各2个字节
   // 3. 合并后的内容，计算md5，称之为影分身Hash
-  // 4. 这个hash的结果，就是文件存在，有小概率误判，但是如果不存在，是100%准的的 ，和布隆过滤器的思路有些相似
+  // 4. 这个hash的结果，就是文件存在，有小概率误判，但是如果不存在，是100%准的的 
   const calculateHash = (partList: Part[]): Promise<string> => {
     return new Promise(resolve => {
       const spark = new SparkMD5.ArrayBuffer();
